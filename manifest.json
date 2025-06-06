@@ -6,6 +6,9 @@
   "permissions": [
     "scripting" // Permissão para injetar scripts
   ],
+  "icons": {
+    "144": "/icons/opera.png"
+  },
   "host_permissions": [
     "https://accorcu2.oraclehospitality.us-ashburn-1.ocs.oraclecloud.com/*", // Permissão para o domínio OPERA Cloud
     "https://viacep.com.br/*", // Permissão para a API do ViaCEP
