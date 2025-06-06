@@ -7,7 +7,7 @@
     "scripting" // Permissão para injetar scripts
   ],
   "icons": {
-    "144": "/icons/opera.png"
+    "144": "/icons/opera144.png"
   },
   "host_permissions": [
     "https://accorcu2.oraclehospitality.us-ashburn-1.ocs.oraclecloud.com/*", // Permissão para o domínio OPERA Cloud
