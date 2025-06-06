@@ -1,1 +1,9 @@
-
+{
+  "cep": ["CEP"],
+  "rua": ["Rua", "Logradouro"],
+  "bairro": ["Bairro"],
+  "cidade": ["Cidade", "Localidade"],
+  "estado": ["Estado", "UF"],
+  "complemento": ["Complemento"],
+  "numero": ["Número", "No.", "Nº"]
+}
