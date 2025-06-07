@@ -1,5 +1,5 @@
 {
-  "cep": ["CEP"],
+  "cep": ["CEP", "Postal Code"],
   "rua": ["Rua", "Logradouro"],
   "bairro": ["Bairro"],
   "cidade": ["Cidade", "Localidade"],
