@@ -1,26 +1,28 @@
 {
-  "manifest_version": 3,
-  "name": "Preenchimento Automático CEP OPERA Cloud",
-  "version": "1.0",
-  "description": "Preenche automaticamente endereços no OPERA Cloud usando CEP, sem verificação de hotel premium.",
-  "permissions": [
-    "scripting" // Permissão para injetar scripts
-  ],
-  "icons": {
-    "144": "/icons/opera144.png"
-  },
-  "host_permissions": [
-    "https://accorcu2.oraclehospitality.us-ashburn-1.ocs.oraclecloud.com/*", // Permissão para o domínio OPERA Cloud
-    "https://viacep.com.br/*", // Permissão para a API do ViaCEP
-    "https://raw.githubusercontent.com/*" // Permissão para buscar as traduções
-  ],
-  "content_scripts": [
-    {
-      "matches": ["https://accorcu2.oraclehospitality.us-ashburn-1.ocs.oraclecloud.com/*"], // Onde o script será injetado
-      "js": ["autofill_cep.js"] // Nome do seu arquivo JavaScript. CERTIFIQUE-SE DE QUE ESTE NOME ESTÁ CORRETO!
-    }
-  ]
+   "manifest_version":3,
+   "name":"Preenchimento Automático CEP OPERA Cloud",
+   "version":"1.5",
+   "description":"Preenche automaticamente endereços no OPERA Cloud usando CEP",
+   "author": "Enzo Kasma",
+   "permissions":[
+      "scripting"
+   ],
+   "icons":{
+      "144":"/icons/opera144.png"
+   },
+   "host_permissions":[
+      "https://accorcu2.oraclehospitality.us-ashburn-1.ocs.oraclecloud.com/*",
+      "https://viacep.com.br/*",
+      "https://raw.githubusercontent.com/*"
+   ],
+   "content_scripts":[
+      {
+         "matches":[
+            "https://accorcu2.oraclehospitality.us-ashburn-1.ocs.oraclecloud.com/*"
+         ],
+         "js":[
+            "autofill_cep.js"
+         ]
+      }
+   ]
 }
-//5134451520121297
-//112
-//0427
