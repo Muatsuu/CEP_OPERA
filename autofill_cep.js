@@ -3,14 +3,17 @@
 const translationsUrl = 'https://raw.githubusercontent.com/Muatsuu/CEP_OPERA/refs/heads/main/translateLabels.json';
 
 let translations = {};
+let checkInputsInterval = null; // Variável para armazenar o ID do intervalo
+let currentAddressInputs = null; // Armazena os inputs de endereço atualmente encontrados
+let isListenerAttached = false; // Flag para verificar se o listener já foi anexado
 
 // true para visualizar log no console do navegador
 const DEBUGGING_ON_CONSOLE = true;
 
 // Função básica de log
 const log = {
-    log: function(msg){
-        if (DEBUGGING_ON_CONSOLE){
+    log: function(msg) {
+        if (DEBUGGING_ON_CONSOLE) {
             console.log(msg);
         }
     }
@@ -26,37 +29,22 @@ async function fetchTranslations(url) {
         if (!response.ok) {
             throw new Error('Erro na resposta da API ao buscar traduções.');
         }
-
         translations = await response.json();
-
         log.log('Traduções carregadas com sucesso!', translations);
     } catch (error) {
-        // Usar console.error para erros
         console.error('Erro ao carregar as traduções:', error);
     }
 }
 
-/**
- * Inicializa a extensão: carrega traduções e inicia a verificação dos inputs.
- */
-async function initialize() {
-    await fetchTranslations(translationsUrl); // Aguarda carregar as traduções
-    log.log("Inicializando intervalo para verificar inputs...");
-    // Verifica os inputs a cada 4 segundos
-    setInterval(loopWindowAndFramesAndCheckInputs, 4000);
-}
-
-// Opções de campos para preenchimento automático: "rua", "bairro", "cidade", "estado", "complemento"
-// Sempre em lowerCase()
-// Adicionamos 'numero' aqui para que ele seja considerado no preenchimento
-const fieldsYouWantToAutoFill = ['rua', 'bairro', 'complemento', 'numero']; // Adicionado 'numero'
+// Opções de campos para preenchimento automático: "rua", "bairro", "cidade", "estado", "complemento", "numero"
+const fieldsYouWantToAutoFill = ['rua', 'bairro', 'complemento', 'numero'];
 
 /**
  * Normaliza uma string, removendo acentos e caracteres especiais.
  * @param {string} string_text - O texto a ser normalizado.
  * @returns {string} O texto normalizado.
  */
-function normalizeString(string_text){
+function normalizeString(string_text) {
     return string_text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
@@ -72,7 +60,7 @@ async function consultarCEP(cep) {
 
         if (data.erro) {
             log.log("CEP não encontrado pela ViaCEP.");
-            return null; // Retorna null em caso de erro no CEP
+            return null;
         }
 
         const endereco = {
@@ -81,34 +69,13 @@ async function consultarCEP(cep) {
             cidade: normalizeString(data.localidade),
             bairro: normalizeString(data.bairro),
             rua: normalizeString(data.logradouro),
-            complemento: normalizeString(data.complemento) || null, // Complemento pode ser nulo
-            // O ViaCEP não retorna o número, então não o incluímos aqui.
-            // Ele será tratado pela lógica customizada abaixo.
+            complemento: normalizeString(data.complemento) || null,
         };
-
         return endereco;
     } catch (error) {
         log.log(`Erro ao consultar CEP: ${error.message}`);
-        return null; // Retorna null em caso de erro na requisição
+        return null;
     }
-}
-
-/**
- * Busca um elemento no DOM pelo seletor e por um trecho do seu ID.
- * Esta função não é mais usada para o HOTEL_ID, mas é mantida por segurança caso seja relevante para outros elementos.
- * @param {string} selector - O seletor CSS (ex: 'span', 'input').
- * @param {string[]} possibleText - Array de trechos de texto que o ID do elemento pode conter.
- * @param {Window} [win=window] - A janela (window ou iframe) onde buscar o elemento.
- * @returns {HTMLElement|boolean} O elemento encontrado ou false se não for encontrado.
- */
-function querySelectorByIdIncludesText (selector, possibleText, win = window){
-    for (let text of possibleText){
-        let resultado = Array.from(win.document.querySelectorAll(selector)).find(el => el.id.includes(text)) || false;
-        if (resultado){
-            return resultado;
-        }
-    }
-    return false;
 }
 
 /**
@@ -119,11 +86,9 @@ function querySelectorByIdIncludesText (selector, possibleText, win = window){
  */
 function findFieldByLabel(possibleLabels, win = window) {
     for (let labelText of possibleLabels) {
-        let resultadoLabel = Array.from(win.document.querySelectorAll('label')).find(el => el.textContent.trim() === labelText) || false;
-
-        if(resultadoLabel) {
+        const resultadoLabel = Array.from(win.document.querySelectorAll('label')).find(el => el.textContent.trim() === labelText);
+        if (resultadoLabel) {
             if (resultadoLabel.htmlFor) {
-                // Se o label tem um 'htmlFor', ele está associado a um input com esse ID
                 return win.document.getElementById(resultadoLabel.htmlFor);
             }
         }
@@ -138,29 +103,37 @@ function findFieldByLabel(possibleLabels, win = window) {
  * @param {number} tempo - O tempo em milissegundos que a mensagem ficará visível.
  */
 function successMsg(texto, local, tempo) {
-    var alertElement = document.createElement("div");
+    const existingAlert = document.getElementById('cep-opera-alert');
+    if (existingAlert) {
+        existingAlert.remove();
+    }
+
+    const alertElement = document.createElement("div");
+    alertElement.id = 'cep-opera-alert';
     alertElement.innerHTML = `<p>${texto}</p>`;
-    alertElement.style.position = "fixed";
-    alertElement.style.top = "50%";
-    alertElement.style.left = "50%";
-    alertElement.style.transform = "translate(-50%, -50%)";
-    alertElement.style.padding = "20px";
-    alertElement.style.background = "linear-gradient(120deg, #007BFF, #00D4BF)"; // Gradiente suave
-    alertElement.style.borderRadius = "8px"; // Bordas arredondadas
-    alertElement.style.border = "1px solid #ccc";
-    alertElement.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.2)"; // Sombra suave
-    alertElement.style.zIndex = 9999999999999;
-    alertElement.style.fontFamily = "Arial, sans-serif";
-    alertElement.style.fontSize = "16px";
-    alertElement.style.color = "#ffffff"; // Texto branco para contraste
-    alertElement.style.display = "none"; // Inicia oculto
+    alertElement.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 20px;
+        background: linear-gradient(120deg, #007BFF, #00D4BF);
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        z-index: 9999999999999;
+        font-family: Arial, sans-serif;
+        font-size: 16px;
+        color: #ffffff;
+        display: none;
+    `;
 
     if (local) {
         local.appendChild(alertElement);
     }
-    alertElement.style.display = "block"; // Exibe
-    setTimeout(function () {
-        alertElement.style.display = "none"; // Oculta após o tempo
+    alertElement.style.display = "block";
+    setTimeout(() => {
+        alertElement.remove(); // Remove o elemento do DOM após o tempo
     }, tempo);
 }
 
@@ -168,91 +141,118 @@ function successMsg(texto, local, tempo) {
  * Retorna um objeto com referências aos inputs do formulário de endereço.
  * Usa as traduções para encontrar os rótulos corretos.
  * @param {Window} [win=window] - A janela (window ou iframe) onde buscar os inputs.
- * @returns {object} Um objeto contendo os elementos de input e um método de verificação.
+ * @returns {object|null} Um objeto contendo os elementos de input e um método de verificação, ou null se não forem encontrados.
  */
-const formInputs = function (win = window) {
-    return {
+function getFormInputs(win = window) {
+    const inputs = {
         cep: findFieldByLabel(translations.cep, win),
         rua: findFieldByLabel(translations.rua, win),
         bairro: findFieldByLabel(translations.bairro, win),
         cidade: findFieldByLabel(translations.cidade, win),
         estado: findFieldByLabel(translations.estado, win),
         complemento: findFieldByLabel(translations.complemento, win),
-        numero: findFieldByLabel(translations.numero, win), // <--- Adicionado o campo 'numero'
-
-        // Verifica se os campos essenciais (CEP, Rua, Complemento, Numero) foram encontrados
-        wereFounded : function(){
-            return this.cep && this.rua && this.complemento && this.numero; // <--- Adicionado 'this.numero'
-        },
-        win : win
+        numero: findFieldByLabel(translations.numero, win),
+        win: win
     };
-};
+
+    if (inputs.cep && inputs.rua && inputs.complemento && inputs.numero) {
+        return inputs;
+    }
+    return null;
+}
 
 /**
  * Tenta preencher os campos de endereço com base no CEP inserido.
- * Esta versão não faz verificação de "hotel premium".
  * @param {object} inputForm - Objeto contendo os elementos dos inputs do formulário.
  */
-function mayFillAdress(inputForm){
-    const cepValue = inputForm.cep.value.replace(/\D/g, ''); // Remove caracteres não numéricos do CEP
+async function mayFillAdress(inputForm) {
+    const cepValue = inputForm.cep.value.replace(/\D/g, '');
 
-    if (cepValue.length === 8){
-        consultarCEP(cepValue).then((correiosData) => {
-            if(correiosData){
-                log.log(correiosData);
-                // Preenche os campos desejados
-                for (let field of fieldsYouWantToAutoFill){
-                    // Lógica para o campo 'numero'
-                    if (field === 'numero') {
-                        if (cepValue === '14027250') {
-                            inputForm.numero.value = '780';
-                            log.log('CEP 14027250 detectado. Número preenchido com 780.');
-                        } else {
-                            inputForm.numero.value = ''; // Limpa o número para outros CEPs
-                            log.log('Outro CEP detectado. Número do endereço em branco.');
-                        }
-                    } else if (correiosData[field] !== undefined){
-                        inputForm[field].value = correiosData[field];
+    if (cepValue.length === 8) {
+        const correiosData = await consultarCEP(cepValue);
+        if (correiosData) {
+            log.log(correiosData);
+            for (let field of fieldsYouWantToAutoFill) {
+                if (field === 'numero') {
+                    if (cepValue === '14027250') {
+                        inputForm.numero.value = '780';
+                        log.log('CEP 14027250 detectado. Número preenchido com 780.');
                     } else {
-                        inputForm[field].value = ""; // Limpa se o dado não existir
+                        inputForm.numero.value = '';
+                        log.log('Outro CEP detectado. Número do endereço em branco.');
                     }
+                } else if (correiosData[field] !== undefined) {
+                    inputForm[field].value = correiosData[field];
+                } else {
+                    inputForm[field].value = "";
                 }
-                successMsg('De nada! ;)', document.body, 3000);
             }
-        });
+            successMsg('De nada! ;)', document.body, 1000); // Mensagem por 1 segundo
+        }
     }
 }
 
 /**
- * Percorre a janela principal e os iframes para encontrar os inputs de endereço.
- * Ao encontrar, adiciona um event listener ao campo CEP.
+ * Função que tenta encontrar os inputs de endereço e configurar o listener.
+ * Será chamada repetidamente pelo setInterval.
  */
-function loopWindowAndFramesAndCheckInputs(){
-    // Verifica nos iframes
-    for (let i = 0; i < window.frames.length; i++) {
-        const currentFrameInputs = formInputs(window.frames[i]);
-        if(currentFrameInputs.wereFounded()){
-            log.log('Encontrou os inputs em um iframe.');
-            // Adiciona listener ao CEP do iframe
-            currentFrameInputs.cep.addEventListener('input', function(){
-                mayFillAdress(currentFrameInputs);
-            });
-            return; // Retorna após encontrar e adicionar o listener
+function setupAddressListeners() {
+    let foundInputs = null;
+
+    // Tenta encontrar inputs na janela principal
+    foundInputs = getFormInputs(window);
+
+    // Se não encontrou na janela principal, verifica nos iframes
+    if (!foundInputs) {
+        for (let i = 0; i < window.frames.length; i++) {
+            try {
+                const currentFrameInputs = getFormInputs(window.frames[i]);
+                if (currentFrameInputs) {
+                    foundInputs = currentFrameInputs;
+                    log.log('Encontrou os inputs em um iframe.');
+                    break;
+                }
+            } catch (e) {
+                log.log(`Não foi possível acessar o iframe ${i}: ${e.message}`);
+            }
         }
     }
 
-    // Se não encontrou em iframes, verifica na janela principal
-    const mainWinInputs = formInputs(window);
-    if(mainWinInputs.wereFounded()){
-        log.log("Encontrou os inputs fora de um frame (na janela principal).");
-        // Adiciona listener ao CEP da janela principal
-        mainWinInputs.cep.addEventListener('input',function(){
-            mayFillAdress(mainWinInputs);
-        });
-        return;
-    }
+    // Se novos inputs foram encontrados e são diferentes dos anteriores, ou se é a primeira vez
+    if (foundInputs && (currentAddressInputs !== foundInputs || !isListenerAttached)) {
+        // Se o listener estava anexado a inputs antigos, remove-o para evitar múltiplos listeners
+        if (currentAddressInputs && isListenerAttached && currentAddressInputs.cep) {
+            currentAddressInputs.cep.removeEventListener('input', () => mayFillAdress(currentAddressInputs));
+            log.log("Listener de CEP antigo removido.");
+        }
 
-    log.log('Não localizou os inputs de endereço.');
+        currentAddressInputs = foundInputs;
+        currentAddressInputs.cep.addEventListener('input', () => mayFillAdress(currentAddressInputs));
+        isListenerAttached = true;
+        log.log("Listener de CEP adicionado/reatribuído com sucesso.");
+    } else if (!foundInputs && isListenerAttached) {
+        // Se os inputs não foram encontrados, mas o listener estava ativo, ele pode ter sumido.
+        // Reinicia o flag para que um novo listener seja anexado se os inputs reaparecerem.
+        if (currentAddressInputs && currentAddressInputs.cep) {
+            currentAddressInputs.cep.removeEventListener('input', () => mayFillAdress(currentAddressInputs));
+            log.log("Inputs de endereço desapareceram. Listener de CEP removido.");
+        }
+        currentAddressInputs = null;
+        isListenerAttached = false;
+    } else if (!foundInputs) {
+        log.log('Não localizou os inputs de endereço. Continuando a verificação...');
+    }
+}
+
+/**
+ * Inicializa a extensão: carrega traduções e inicia a verificação dos inputs.
+ */
+async function initialize() {
+    await fetchTranslations(translationsUrl);
+    // Inicia a verificação contínua dos inputs a cada 2 segundos
+    checkInputsInterval = setInterval(setupAddressListeners, 2000);
+    // Tenta configurar os listeners imediatamente na inicialização
+    setupAddressListeners();
 }
 
 // Inicia a execução da extensão
