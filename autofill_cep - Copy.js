@@ -49,31 +49,32 @@ function normalizeString(string_text) {
 }
 
 /**
- * Consulta a API ViaCEP para obter dados de endereço.
+ * Consulta a API BrasilAPI para obter dados de endereço.
  * @param {string} cep - O CEP a ser consultado.
  * @returns {Promise<object|null>} Um objeto com os dados do endereço ou null se o CEP não for encontrado ou houver erro.
  */
 async function consultarCEP(cep) {
     try {
-        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`);
         const data = await response.json();
 
-        if (data.erro) {
-            log.log("CEP não encontrado pela ViaCEP.");
+        // BrasilAPI retorna um objeto de erro com a propriedade 'type'
+        if (response.status === 404 || data.type === 'service_error' || data.type === 'validation_error') {
+            log.log("CEP não encontrado pela BrasilAPI ou erro na consulta.");
             return null;
         }
 
         const endereco = {
             cep: normalizeString(data.cep),
-            estado: normalizeString(data.uf),
-            cidade: normalizeString(data.localidade),
-            bairro: normalizeString(data.bairro),
-            rua: normalizeString(data.logradouro),
-            complemento: normalizeString(data.complemento) || null,
+            estado: normalizeString(data.state),
+            cidade: normalizeString(data.city),
+            bairro: normalizeString(data.neighborhood),
+            rua: normalizeString(data.street),
+            complemento: normalizeString(data.complemento || '') || null, // A BrasilAPI pode não retornar complemento
         };
         return endereco;
     } catch (error) {
-        log.log(`Erro ao consultar CEP: ${error.message}`);
+        log.log(`Erro ao consultar CEP na BrasilAPI: ${error.message}`);
         return null;
     }
 }
@@ -169,9 +170,9 @@ async function mayFillAdress(inputForm) {
     const cepValue = inputForm.cep.value.replace(/\D/g, '');
 
     if (cepValue.length === 8) {
-        const correiosData = await consultarCEP(cepValue);
-        if (correiosData) {
-            log.log(correiosData);
+        const addressData = await consultarCEP(cepValue);
+        if (addressData) {
+            log.log(addressData);
             for (let field of fieldsYouWantToAutoFill) {
                 if (field === 'numero') {
                     if (cepValue === '14027250') {
@@ -181,8 +182,8 @@ async function mayFillAdress(inputForm) {
                         inputForm.numero.value = '';
                         log.log('Outro CEP detectado. Número do endereço em branco.');
                     }
-                } else if (correiosData[field] !== undefined) {
-                    inputForm[field].value = correiosData[field];
+                } else if (addressData[field] !== undefined) {
+                    inputForm[field].value = addressData[field];
                 } else {
                     inputForm[field].value = "";
                 }
