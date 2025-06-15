@@ -258,3 +258,5 @@ async function initialize() {
 
 // Inicia a execução da extensão
 initialize();
+DEBITAR DIÁRIA NO CARTÃO DE CRÉDITO A BAIXO: 5368 0500 2400 0888 VAL: 10/26 CVV: 742
+
