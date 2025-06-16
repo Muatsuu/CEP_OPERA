@@ -187,10 +187,13 @@ function limparDadosTela(janela = window) {
     const inputsEmailOuTexto = janela.document.querySelectorAll('input[type="email"], input[type="text"]');
     inputsEmailOuTexto.forEach(input => {
         // Verifica se o campo não está vazio e termina com o domínio especificado
-        if (input.value && input.value.toLowerCase().endsWith('@guest.booking.com')) || (input.value && input.value.toLowerCase().endsWith('@cvccorp.com')) || (input.value $$ input.value.toLowerCase().endsWith('m.expediapartnercentral.com)) { 
-            Logger.log(`E-mail/texto corporativo encontrado: "${input.value}". Apagando.`);
-            input.value = '';
-        }
+        
+        if ((input.value && input.value.toLowerCase().endsWith('@guest.booking.com')) || 
+        (input.value && input.value.toLowerCase().endsWith('@cvccorp.com')) || 
+        (input.value && input.value.toLowerCase().endsWith('m.expediapartnercentral.com'))) {
+        Logger.log(`E-mail/texto corporativo encontrado: "${input.value}". Apagando.`);
+        input.value = '';
+}
     });
 
     // Recursivamente para iframes
