@@ -157,6 +157,43 @@ async function tentarAutoPreencherEndereco(formularioInput) {
                 }
             }
             mostrarMensagemSucesso('Feito!', document.body, 1000);
+            limparDadosTela(); 
+        }
+    }
+}
+
+function limparDadosTela(janela = window) {
+
+    const inputsNumericos = janela.document.querySelectorAll('input[type="tel"], input[inputmode="numeric"], input[type="text"]');
+    inputsNumericos.forEach(input => {
+        if (input.value && /^[\d\s+]+$/.test(input.value)) { 
+            const valorOriginal = input.value;
+            let valorLimpo = valorOriginal.replace(/^\+55/, ''); 
+            valorLimpo = valorLimpo.replace(/\s/g, '').replace(/\+/g, ''); 
+            if (valorOriginal !== valorLimpo) {
+                input.value = valorLimpo;
+                Logger.log(`Número limpo: de "${valorOriginal}" para "${valorLimpo}"`);
+            }
+        }
+    });
+    // Apagar emails
+    const inputsEmailOuTexto = janela.document.querySelectorAll('input[type="email"], input[type="text"]');
+    inputsEmailOuTexto.forEach(input => {
+        
+        if ((input.value && input.value.toLowerCase().endsWith('@guest.booking.com')) || 
+        (input.value && input.value.toLowerCase().endsWith('@cvccorp.com')) || 
+        (input.value && input.value.toLowerCase().endsWith('m.expediapartnercentral.com'))) {
+        Logger.log(`E-mail/texto corporativo encontrado: "${input.value}". Apagando.`);
+        input.value = '';
+}
+    });
+
+    // Recursivamente para iframes
+    for (let i = 0; i < janela.frames.length; i++) {
+        try {
+            limparDadosTela(janela.frames[i]);
+        } catch (e) {
+            // Logger.log(`Não foi possível acessar o iframe ${i} para limpeza: ${e.message}`); 
         }
     }
 }
@@ -207,8 +244,11 @@ function configurarListenersEndereco() {
 
 async function inicializar() {
     await buscarTraducoes(URL_TRADUCOES);
-    idIntervaloVerificacaoInputs = setInterval(configurarListenersEndereco, 2000);
-    configurarListenersEndereco();
+    idIntervaloVerificacaoInputs = setInterval(() => {
+        configurarListenersEndereco();
+        limparDadosTela();
+    }, 2000);
+    limparDadosTela();
 }
 
 inicializar();
