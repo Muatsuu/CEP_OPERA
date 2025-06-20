@@ -37,15 +37,46 @@ async function buscarTraducoes(url) {
 const CAMPOS_AUTO_PREENCHIMENTO = ['rua', 'bairro', 'complemento', 'numero'];
 
 function normalizarString(texto) {
+    // Garante que o texto seja tratado como string antes de normalizar
+    if (typeof texto !== 'string') {
+        return '';
+    }
     return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+// --- NOVA FUNÇÃO: Consultar ViaCEP ---
+async function consultarViaCEP(cep) {
+    try {
+        Logger.log(`Tentando ViaCEP para o CEP: ${cep}`);
+        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, { timeout: 5000 }); // Adiciona timeout
+        const data = await response.json();
+
+        if (!response.ok || data.erro) { // ViaCEP retorna 'erro: true' para CEPs não encontrados
+            Logger.log(`CEP não encontrado pela ViaCEP ou erro na consulta. Status: ${response.status}, Erro ViaCEP: ${data.erro}`);
+            return null;
+        }
+
+        return {
+            cep: normalizarString(data.cep),
+            estado: normalizarString(data.uf),
+            cidade: normalizarString(data.localidade),
+            bairro: normalizarString(data.bairro),
+            rua: normalizarString(data.logradouro),
+            complemento: normalizarString(data.complemento || '') || null,
+        };
+    } catch (error) {
+        Logger.error(`Erro ao consultar CEP na ViaCEP: ${error.message}`);
+        return null;
+    }
 }
 
 async function consultarBrasilAPI(cep) {
     try {
-        const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`);
+        Logger.log(`Tentando BrasilAPI para o CEP: ${cep}`);
+        const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`, { timeout: 5000 }); // Adiciona timeout
         const data = await response.json();
 
-        if (response.status === 404 || data.type === 'service_error' || data.type === 'validation_error') {
+        if (!response.ok || response.status === 404 || data.type === 'service_error' || data.type === 'validation_error') {
             Logger.log("CEP não encontrado pela BrasilAPI ou erro na consulta.");
             return null;
         }
@@ -143,7 +174,15 @@ async function tentarAutoPreencherEndereco(formularioInput) {
     const valorCep = formularioInput.cep.value.replace(/\D/g, '');
 
     if (valorCep.length === 8) {
-        const dadosEndereco = await consultarBrasilAPI(valorCep);
+        let dadosEndereco = null;
+
+        dadosEndereco = await consultarViaCEP(valorCep);
+
+        if (!dadosEndereco) {
+            Logger.log("ViaCEP falhou ou não encontrou o CEP. Tentando BrasilAPI...");
+            dadosEndereco = await consultarBrasilAPI(valorCep);
+        }
+
         if (dadosEndereco) {
             Logger.log('Dados de endereço recebidos:', dadosEndereco);
             for (const campo of CAMPOS_AUTO_PREENCHIMENTO) {
@@ -156,8 +195,28 @@ async function tentarAutoPreencherEndereco(formularioInput) {
                     formularioInput[campo].value = "";
                 }
             }
+            if (formularioInput.cidade && dadosEndereco.cidade) {
+                formularioInput.cidade.value = dadosEndereco.cidade;
+            } else if (formularioInput.cidade) {
+                formularioInput.cidade.value = "";
+            }
+            if (formularioInput.estado && dadosEndereco.estado) {
+                formularioInput.estado.value = dadosEndereco.estado;
+            } else if (formularioInput.estado) {
+                formularioInput.estado.value = "";
+            }
+
             mostrarMensagemSucesso('Feito!', document.body, 1000);
-            limparDadosTela(); 
+            limparDadosTela();
+        } else {
+            Logger.log(`Não foi possível obter dados para o CEP ${valorCep} de nenhuma API.`);
+            // for (const campo of CAMPOS_AUTO_PREENCHIMENTO) {
+            //     if (formularioInput[campo]) {
+            //         formularioInput[campo].value = "";
+            //     }
+            // }
+            // if (formularioInput.cidade) formularioInput.cidade.value = "";
+            // if (formularioInput.estado) formularioInput.estado.value = "";
         }
     }
 }
@@ -166,10 +225,10 @@ function limparDadosTela(janela = window) {
 
     const inputsNumericos = janela.document.querySelectorAll('input[type="tel"], input[inputmode="numeric"], input[type="text"]');
     inputsNumericos.forEach(input => {
-        if (input.value && /^[\d\s+]+$/.test(input.value)) { 
+        if (input.value && /^[\d\s+]+$/.test(input.value)) {
             const valorOriginal = input.value;
-            let valorLimpo = valorOriginal.replace(/^\+55/, ''); 
-            valorLimpo = valorLimpo.replace(/\s/g, '').replace(/\+/g, ''); 
+            let valorLimpo = valorOriginal.replace(/^\+55/, '');
+            valorLimpo = valorLimpo.replace(/\s/g, '').replace(/\+/g, '');
             if (valorOriginal !== valorLimpo) {
                 input.value = valorLimpo;
                 Logger.log(`Número limpo: de "${valorOriginal}" para "${valorLimpo}"`);
@@ -179,13 +238,13 @@ function limparDadosTela(janela = window) {
     // Apagar emails
     const inputsEmailOuTexto = janela.document.querySelectorAll('input[type="email"], input[type="text"]');
     inputsEmailOuTexto.forEach(input => {
-        
-        if ((input.value && input.value.toLowerCase().endsWith('@guest.booking.com')) || 
-        (input.value && input.value.toLowerCase().endsWith('@cvccorp.com')) || 
-        (input.value && input.value.toLowerCase().endsWith('m.expediapartnercentral.com'))) {
-        Logger.log(`E-mail/texto corporativo encontrado: "${input.value}". Apagando.`);
-        input.value = '';
-}
+
+        if ((input.value && input.value.toLowerCase().endsWith('@guest.booking.com')) ||
+            (input.value && input.value.toLowerCase().endsWith('@cvccorp.com')) ||
+            (input.value && input.value.toLowerCase().endsWith('m.expediapartnercentral.com'))) {
+            Logger.log(`E-mail/texto corporativo encontrado: "${input.value}". Apagando.`);
+            input.value = '';
+        }
     });
 
     // Recursivamente para iframes
@@ -193,7 +252,7 @@ function limparDadosTela(janela = window) {
         try {
             limparDadosTela(janela.frames[i]);
         } catch (e) {
-            // Logger.log(`Não foi possível acessar o iframe ${i} para limpeza: ${e.message}`); 
+            // Logger.log(`Não foi possível acessar o iframe ${i} para limpeza: ${e.message}`);
         }
     }
 }
