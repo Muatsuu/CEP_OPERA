@@ -1,8 +1,8 @@
 {
    "manifest_version":3,
    "name":"Preenchimento Automático CEP OPERA Cloud",
-   "version":"1.6",
-   "description":"Preenche automaticamente endereços no OPERA Cloud usando CEP",
+   "version":"2.0",
+   "description":"Preenche automaticamente endereços no OPERA Cloud usando as apis ViaCep e BrasilApi",
    "author": "Enzo Kasma",
    "permissions":[
       "scripting"
@@ -13,6 +13,7 @@
    "host_permissions":[
       "https://accorcu2.oraclehospitality.us-ashburn-1.ocs.oraclecloud.com/*",
       "https://viacep.com.br/*",
+      "https://brasilapi.com.br/*",
       "https://raw.githubusercontent.com/*"
    ],
    "content_scripts":[
