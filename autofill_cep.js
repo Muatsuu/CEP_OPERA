@@ -1,12 +1,21 @@
 "use strict";
 
-const URL_TRADUCOES = 'https://raw.githubusercontent.com/Muatsuu/CEP_OPERA/refs/heads/main/translateLabels.json';
 const DEBUGGING_ATIVADO = true;
 
-let traducoes = {};
-let idIntervaloVerificacaoInputs = null;
+// Dicionário de traduções embutido localmente
+const traducoes = {
+  "cep": ["CEP", "Postal Code"],
+  "rua": ["Rua", "Logradouro"],
+  "bairro": ["Bairro"],
+  "cidade": ["Cidade", "Localidade"],
+  "estado": ["Estado", "UF"],
+  "complemento": ["Complemento"],
+  "numero": ["Número", "No.", "Nº"]
+};
+
 let inputsEnderecoAtuais = null;
 let listenerAnexado = false;
+let idIntervaloVerificacaoInputs = null;
 
 const Logger = {
     log: function(...args) {
@@ -21,37 +30,22 @@ const Logger = {
     }
 };
 
-async function buscarTraducoes(url) {
-    try {
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`Erro HTTP! Status: ${response.status}`);
-        }
-        traducoes = await response.json();
-        Logger.log('Traduções carregadas com sucesso!', traducoes);
-    } catch (error) {
-        Logger.error('Erro ao carregar as traduções:', error);
-    }
-}
-
 const CAMPOS_AUTO_PREENCHIMENTO = ['rua', 'bairro', 'complemento', 'numero'];
 
 function normalizarString(texto) {
-    // Garante que o texto seja tratado como string antes de normalizar
     if (typeof texto !== 'string') {
         return '';
     }
     return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
-// --- NOVA FUNÇÃO: Consultar ViaCEP ---
 async function consultarViaCEP(cep) {
     try {
         Logger.log(`Tentando ViaCEP para o CEP: ${cep}`);
-        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, { timeout: 5000 }); // Adiciona timeout
+        const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, { timeout: 5000 });
         const data = await response.json();
 
-        if (!response.ok || data.erro) { // ViaCEP retorna 'erro: true' para CEPs não encontrados
+        if (!response.ok || data.erro) {
             Logger.log(`CEP não encontrado pela ViaCEP ou erro na consulta. Status: ${response.status}, Erro ViaCEP: ${data.erro}`);
             return null;
         }
@@ -73,7 +67,7 @@ async function consultarViaCEP(cep) {
 async function consultarBrasilAPI(cep) {
     try {
         Logger.log(`Tentando BrasilAPI para o CEP: ${cep}`);
-        const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`, { timeout: 5000 }); // Adiciona timeout
+        const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`, { timeout: 5000 });
         const data = await response.json();
 
         if (!response.ok || response.status === 404 || data.type === 'service_error' || data.type === 'validation_error') {
@@ -210,13 +204,6 @@ async function tentarAutoPreencherEndereco(formularioInput) {
             limparDadosTela();
         } else {
             Logger.log(`Não foi possível obter dados para o CEP ${valorCep} de nenhuma API.`);
-            // for (const campo of CAMPOS_AUTO_PREENCHIMENTO) {
-            //     if (formularioInput[campo]) {
-            //         formularioInput[campo].value = "";
-            //     }
-            // }
-            // if (formularioInput.cidade) formularioInput.cidade.value = "";
-            // if (formularioInput.estado) formularioInput.estado.value = "";
         }
     }
 }
@@ -235,7 +222,6 @@ function limparDadosTela(janela = window) {
             }
         }
     });
-    // Apagar emails
     const inputsEmailOuTexto = janela.document.querySelectorAll('input[type="email"], input[type="text"]');
     inputsEmailOuTexto.forEach(input => {
 
@@ -247,12 +233,10 @@ function limparDadosTela(janela = window) {
         }
     });
 
-    // Recursivamente para iframes
     for (let i = 0; i < janela.frames.length; i++) {
         try {
             limparDadosTela(janela.frames[i]);
         } catch (e) {
-            // Logger.log(`Não foi possível acessar o iframe ${i} para limpeza: ${e.message}`);
         }
     }
 }
@@ -302,7 +286,6 @@ function configurarListenersEndereco() {
 }
 
 async function inicializar() {
-    await buscarTraducoes(URL_TRADUCOES);
     idIntervaloVerificacaoInputs = setInterval(() => {
         configurarListenersEndereco();
         limparDadosTela();
