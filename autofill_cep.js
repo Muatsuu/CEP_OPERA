@@ -103,6 +103,10 @@ function encontrarCampoInputPorLabel(textosPossiveisLabel, janela = window) {
                 return inputAssociado;
             }
         }
+      const Traduções = {
+        “Cep“: [“CEP”, “POSTAL“],
+        “Rua” : [“RUA”, “Logradouro”]
+      }
     }
     return null;
 }
