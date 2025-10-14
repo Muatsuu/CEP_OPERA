@@ -1,7 +1,7 @@
 {
    "manifest_version":3,
    "name":"Preenchimento Automático CEP OPERA Cloud",
-   "version":"2.0",
+   "version":"2.2",
    "description":"Preenche automaticamente endereços no OPERA Cloud usando as apis ViaCep e BrasilApi",
    "author": "Enzo Kasma",
    "permissions":[
@@ -27,3 +27,4 @@
       }
    ]
 }
+
