@@ -1,16 +1,18 @@
 "use strict";
 
 const DEBUGGING_ATIVADO = true;
-
-// Dicionário de traduções embutido localmente
+const USUARIOS_PERMITIDOS = [
+    "ENZO.KASMA"
+];
 const traducoes = {
-  "cep": ["CEP", "Postal Code"],
-  "rua": ["Rua", "Logradouro"],
-  "bairro": ["Bairro"],
-  "cidade": ["Cidade", "Localidade"],
-  "estado": ["Estado", "UF"],
-  "complemento": ["Complemento"],
-  "numero": ["Número", "No.", "Nº"]
+    "cep": ["CEP", "Postal Code"],
+    "rua": ["Rua", "Logradouro"],
+    "bairro": ["Bairro"],
+    "cidade": ["Cidade", "Localidade"],
+    "estado": ["Estado", "UF"],
+    "complemento": ["Complemento"],
+    "numero": ["Número", "No.", "Nº"],
+    "pin": ["PIN"],
 };
 
 let inputsEnderecoAtuais = null;
@@ -89,24 +91,40 @@ async function consultarBrasilAPI(cep) {
     }
 }
 
-function encontrarCampoInputPorLabel(textosPossiveisLabel, janela = window) {
+function encontrarCampoInputOuBotao(textosPossiveisLabel, janela = window, tipoElemento = 'input') {
     for (const textoLabel of textosPossiveisLabel) {
         const elementoLabel = Array.from(janela.document.querySelectorAll('label'))
             .find(el => el.textContent.trim() === textoLabel);
 
         if (elementoLabel) {
             if (elementoLabel.htmlFor) {
-                return janela.document.getElementById(elementoLabel.htmlFor);
+                const elemento = janela.document.getElementById(elementoLabel.htmlFor);
+                if (elemento && elemento.tagName.toLowerCase() === tipoElemento) {
+                    return elemento;
+                }
             }
-            const inputAssociado = elementoLabel.querySelector('input') || elementoLabel.nextElementSibling;
-            if (inputAssociado && inputAssociado.tagName === 'INPUT') {
+            const inputAssociado = elementoLabel.querySelector(tipoElemento) || elementoLabel.nextElementSibling;
+            if (inputAssociado && inputAssociado.tagName.toLowerCase() === tipoElemento) {
                 return inputAssociado;
             }
         }
-      const Traduções = {
-        “Cep“: [“CEP”, “POSTAL“],
-        “Rua” : [“RUA”, “Logradouro”]
-      }
+    }
+
+    if (tipoElemento === 'button') {
+        const botao = Array.from(janela.document.querySelectorAll('button'))
+            .find(btn => btn.textContent.trim() === textosPossiveisLabel[0]);
+        if (botao) return botao;
+    }
+
+    return null;
+}
+
+function encontrarBotaoPorTexto(texto, janela = window) {
+    const botoes = janela.document.querySelectorAll('button, input[type="submit"], input[type="button"]');
+    for (const botao of botoes) {
+        if (botao.textContent.trim() === texto || botao.value === texto) {
+            return botao;
+        }
     }
     return null;
 }
@@ -152,13 +170,13 @@ function obterInputsFormularioEndereco(janela = window) {
     }
 
     const inputs = {
-        cep: encontrarCampoInputPorLabel(traducoes.cep, janela),
-        rua: encontrarCampoInputPorLabel(traducoes.rua, janela),
-        bairro: encontrarCampoInputPorLabel(traducoes.bairro, janela),
-        cidade: encontrarCampoInputPorLabel(traducoes.cidade, janela),
-        estado: encontrarCampoInputPorLabel(traducoes.estado, janela),
-        complemento: encontrarCampoInputPorLabel(traducoes.complemento, janela),
-        numero: encontrarCampoInputPorLabel(traducoes.numero, janela),
+        cep: encontrarCampoInputOuBotao(traducoes.cep, janela, 'input'),
+        rua: encontrarCampoInputOuBotao(traducoes.rua, janela, 'input'),
+        bairro: encontrarCampoInputOuBotao(traducoes.bairro, janela, 'input'),
+        cidade: encontrarCampoInputOuBotao(traducoes.cidade, janela, 'input'),
+        estado: encontrarCampoInputOuBotao(traducoes.estado, janela, 'input'),
+        complemento: encontrarCampoInputOuBotao(traducoes.complemento, janela, 'input'),
+        numero: encontrarCampoInputOuBotao(traducoes.numero, janela, 'input'),
         janela: janela
     };
 
@@ -166,6 +184,14 @@ function obterInputsFormularioEndereco(janela = window) {
         return inputs;
     }
     return null;
+}
+
+function preencherPIN(janela = window) {
+    const inputPin = encontrarCampoInputOuBotao(traducoes.pin, janela, 'input');
+    if (inputPin) {
+        inputPin.value = '102030405060';
+        Logger.log("Campo 'PIN' encontrado e preenchido.");
+    }
 }
 
 async function tentarAutoPreencherEndereco(formularioInput) {
@@ -241,6 +267,7 @@ function limparDadosTela(janela = window) {
         try {
             limparDadosTela(janela.frames[i]);
         } catch (e) {
+            // Ignora erros de acesso a cross-origin frames
         }
     }
 }
@@ -288,13 +315,62 @@ function configurarListenersEndereco() {
         Logger.log('Não localizou os inputs de endereço. Continuando a verificação...');
     }
 }
+function obterUsuarioLogado() {
+    const regexUsuario = /([A-Z0-9]+\.[A-Z0-9]+)/; 
+    
+    const headerElement = document.querySelector('header') || document.body;
+    
+    const walker = document.createTreeWalker(
+        headerElement, 
+        NodeFilter.SHOW_TEXT, 
+        null, 
+        false
+    );
+    
+    let node;
+    while (node = walker.nextNode()) {
+        const match = node.nodeValue.trim().match(regexUsuario);
+        if (match) {
+            return match[1]; // Retorna a string do usuário
+        }
+    }
+    return null;
+}
 
+function verificarAutorizacao() {
+    const usuario = obterUsuarioLogado();
+    
+    if (!usuario) {
+        Logger.log("Usuário logado não encontrado no DOM. Script inativo.");
+        return false;
+    }
+    
+    const usuarioAutorizado = USUARIOS_PERMITIDOS.includes(usuario);
+
+    if (usuarioAutorizado) {
+        Logger.log(`Usuário autorizado: ${usuario}. Ativando funcionalidades.`);
+    } else {
+        Logger.log(`Usuário não autorizado: ${usuario}. Funcionalidades desativadas.`);
+    }
+    
+    return usuarioAutorizado;
+}
 async function inicializar() {
+    if (!verificarAutorizacao()) {
+        return; 
+    }
+    preencherPIN();
+    limparDadosTela();
     idIntervaloVerificacaoInputs = setInterval(() => {
+        if (!verificarAutorizacao()) {
+            clearInterval(idIntervaloVerificacaoInputs);
+            return;
+        }
+        
         configurarListenersEndereco();
+        preencherPIN();
         limparDadosTela();
     }, 2000);
-    limparDadosTela();
 }
 
 inicializar();
